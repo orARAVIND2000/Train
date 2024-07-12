@@ -1,0 +1,7 @@
+
+.box{
+    /* background-color: black; */
+    border: rgb(14, 13, 13) solid 10px;
+    height: 700px;
+    display: flex;
+}

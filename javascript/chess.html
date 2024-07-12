@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive 3D Chess Board</title>
+<style>
+    .chessboard {
+        width: 400px;
+        height: 400px;
+        display: flex;
+        flex-wrap: wrap;
+        perspective: 800px; /* Perspective for 3D effect */
+    }
+
+    .square {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 20px;
+        cursor: pointer;
+        position: relative;
+        transform-style: preserve-3d;
+        transition: transform 0.3s;
+    }
+
+    .white {
+        background-color: #f0d9b5;
+        color: black;
+    }
+
+    .black {
+        background-color: #b58863;
+        color: white;
+    }
+
+    .selected {
+        background-color: lightblue;
+    }
+
+    /* Add 3D transformation on hover */
+    .square:hover {
+        transform: translateY(-5px);
+    }
+</style>
+</head>
+<body>
+
+<div class="chessboard" id="chessboard"></div>
+
+<script>
+    // Chess pieces setup
+    var pieces = [
+        ['♜', '♞', '♝', '♛', '♚', '♝', '♞', '♜'],
+        ['♟', '♟', '♟', '♟', '♟', '♟', '♟', '♟'],
+        ['', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', ''],
+        ['♙', '♙', '♙', '♙', '♙', '♙', '♙', '♙'],
+        ['♖', '♘', '♗', '♕', '♔', '♗', '♘', '♖']
+    ];
+
+    // Current player (true for white, false for black)
+    var currentPlayer = true; // true = white, false = black
+
+    // Selected square
+    var selectedSquare = null;
+
+    // Function to create the chess board
+    function createChessBoard() {
+        var board = document.getElementById('chessboard');
+        var squareColor = true; // true for white, false for black
+
+        for (var row = 0; row < 8; row++) {
+            squareColor = !squareColor; // alternate starting color for each row
+
+            for (var col = 0; col < 8; col++) {
+                var square = document.createElement('div');
+                square.className = 'square ' + (squareColor ? 'white' : 'black');
+                square.setAttribute('data-row', row);
+                square.setAttribute('data-col', col);
+
+                // Add piece to square if there's a piece in the pieces array
+                if (pieces[row][col] !== '') {
+                    square.textContent = pieces[row][col];
+                }
+
+                square.addEventListener('click', squareClickHandler);
+
+                board.appendChild(square);
+                squareColor = !squareColor; // toggle color for next square
+            }
+        }
+    }
+
+    // Handler for when a square is clicked
+    function squareClickHandler() {
+        var clickedSquare = this;
+        var clickedRow = parseInt(clickedSquare.getAttribute('data-row'));
+        var clickedCol = parseInt(clickedSquare.getAttribute('data-col'));
+
+        // If no piece is selected, select this square if it has a piece of the current player's color
+        if (!selectedSquare && pieces[clickedRow][clickedCol] !== '' && isPieceOfCurrentPlayer(clickedRow, clickedCol)) {
+            selectedSquare = clickedSquare;
+            selectedSquare.classList.add('selected');
+        } else if (selectedSquare) {
+            var selectedRow = parseInt(selectedSquare.getAttribute('data-row'));
+            var selectedCol = parseInt(selectedSquare.getAttribute('data-col'));
+
+            // Check if the move is valid
+            if (isValidMove(selectedRow, selectedCol, clickedRow, clickedCol)) {
+                // Move the piece
+                pieces[clickedRow][clickedCol] = pieces[selectedRow][selectedCol];
+                pieces[selectedRow][selectedCol] = '';
+
+                // Update the UI
+                clickedSquare.textContent = selectedSquare.textContent;
+                selectedSquare.textContent = '';
+
+                // Deselect the square
+                selectedSquare.classList.remove('selected');
+                selectedSquare = null;
+
+                // Switch turn
+                currentPlayer = !currentPlayer;
+            } else {
+                // Invalid move, deselect the square
+                selectedSquare.classList.remove('selected');
+                selectedSquare = null;
+            }
+        }
+    }
+
+    // Function to check if a piece belongs to the current player
+    function isPieceOfCurrentPlayer(row, col) {
+        var piece = pieces[row][col];
+        if (currentPlayer && piece.charCodeAt(0) >= 9812 && piece.charCodeAt(0) <= 9817) {
+            return true; // white pieces
+        } else if (!currentPlayer && piece.charCodeAt(0) >= 9818 && piece.charCodeAt(0) <= 9823) {
+            return true; // black pieces
+        }
+        return false;
+    }
+
+    // Function to check if a move is valid
+    function isValidMove(fromRow, fromCol, toRow, toCol) {
+        var piece = pieces[fromRow][fromCol];
+
+        // Check if the move is within the board
+        if (toRow < 0 || toRow > 7 || toCol < 0 || toCol > 7) {
+            return false;
+        }
+
+        // Check if there's no friendly piece at the destination
+        if (pieces[toRow][toCol] !== '' && isPieceOfCurrentPlayer(toRow, toCol)) {
+            return false;
+        }
+
+        // Validate move based on piece type (basic validation, not including special rules like castling, en passant, etc.)
+        switch (piece) {
+            case '♜': // Rook
+            case '♖':
+                return (fromRow === toRow || fromCol === toCol) && isPathClear(fromRow, fromCol, toRow, toCol);
+            case '♞': // Knight
+            case '♘':
+                return ((Math.abs(fromRow - toRow) === 2 && Math.abs(fromCol - toCol) === 1) ||
+                        (Math.abs(fromRow - toRow) === 1 && Math.abs(fromCol - toCol) === 2));
+            case '♝': // Bishop
+            case '♗':
+                return Math.abs(fromRow - toRow) === Math.abs(fromCol - toCol) && isPathClear(fromRow, fromCol, toRow, toCol);
+            case '♛': // Queen
+            case '♕':
+                return ((fromRow === toRow || fromCol === toCol) || (Math.abs(fromRow - toRow) === Math.abs(fromCol - toCol))) && isPathClear(fromRow, fromCol, toRow, toCol);
+            case '♚': // King
+            case '♔':
+                return (Math.abs(fromRow - toRow) <= 1 && Math.abs(fromCol - toCol) <= 1);
+            case '♟': // Pawn
+            case '♙':
+                if (fromCol !== toCol) { // Capture diagonally
+                    return Math.abs(fromCol - toCol) === 1 &&
+                           ((currentPlayer && toRow === fromRow - 1) || (!currentPlayer && toRow === fromRow + 1));
+                } else { // Move forward
+                    if (currentPlayer) {
+                        return (toRow === fromRow - 1 && pieces[toRow][toCol] === '') ||
+                               (fromRow === 6 && toRow === 4 && pieces[5][fromCol] === '' && pieces[4][fromCol] === '');
+                    } else {
+                        return (toRow === fromRow + 1 && pieces[toRow][toCol] === '') ||
+                               (fromRow === 1 && toRow === 3 && pieces[2][fromCol] === '' && pieces[3][fromCol] === '');
+                    }
+                }
+            default:
+                return false;
+        }
+    }
+
+    // Function to check if the path between two squares is clear (excluding the squares themselves)
+    function isPathClear(fromRow, fromCol, toRow, toCol) {
+        var stepRow = fromRow === toRow ? 0 : (toRow - fromRow) / Math.abs(toRow - fromRow);
+        var stepCol = fromCol === toCol ? 0 : (toCol - fromCol) / Math.abs(toCol - fromCol);
+
+        var currentRow = fromRow + stepRow;
+        var currentCol = fromCol + stepCol;
+
+        while (currentRow !== toRow || currentCol !== toCol) {
+            if (pieces[currentRow][currentCol] !== '') {
+                return false;
+            }
+            currentRow += stepRow;
+            currentCol += stepCol;
+        }
+        return true;
+    }
+
+    // Call the function to create the chess board when the page loads
+    window.onload = function() {
+        createChessBoard();
+    };
+</script>
+
+</
+
